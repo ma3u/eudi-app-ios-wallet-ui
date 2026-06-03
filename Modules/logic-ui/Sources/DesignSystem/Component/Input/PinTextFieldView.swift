@@ -115,17 +115,22 @@ public struct PinTextFieldView: View {
     if input.isEmpty && canShowLine {
       showLine()
     } else if isSecureEntry {
-      let image: Image = input.isEmpty
-      ? Image(systemName: "")
-      : Theme.shared.image.circle
-      image
-        .resizable()
-        .frame(width: size, height: size, alignment: .center)
-        .foregroundColor(
-          hasError
-          ? Theme.shared.color.error
-          : Theme.shared.color.onSurface
-        )
+      if input.isEmpty {
+        // Empty PIN position: render a clear placeholder rather than an empty
+        // SF Symbol. `Image(systemName: "")` spams SwiftUI "No symbol named ''"
+        // faults on every render of the PIN entry screen.
+        Color.clear
+          .frame(width: size, height: size, alignment: .center)
+      } else {
+        Theme.shared.image.circle
+          .resizable()
+          .frame(width: size, height: size, alignment: .center)
+          .foregroundColor(
+            hasError
+            ? Theme.shared.color.error
+            : Theme.shared.color.onSurface
+          )
+      }
     } else {
       Text(input)
         .typography(Theme.shared.font.bodyLarge)
