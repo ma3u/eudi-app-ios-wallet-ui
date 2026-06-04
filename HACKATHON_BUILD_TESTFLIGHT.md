@@ -85,6 +85,34 @@ TestFlight builds are **Release** (optimized): you get **symbolicated crash repo
 not live stepping. For step-through debugging use the Xcode device Run (§2). Add `OSLog` /
 `os_signpost` for field diagnostics if needed.
 
+## 5. Wire the Demo config to the SPRIND sandbox
+
+The Demo issuer config lives in `Modules/logic-core/Sources/Config/WalletKitConfig.swift`
+(the `SandboxConfig` enum + the `.DEMO` case of `issuersConfig`). The wallet now **prepends the
+SPRIND/BMDS sandbox PID issuer when configured**, and otherwise keeps using `issuer.eudiw.dev`
+(so the build never breaks before you have the values).
+
+From your sandbox onboarding pack (registrar https://sandbox.eudi-wallet.org/), fill in `SandboxConfig`:
+
+```swift
+enum SandboxConfig {
+  static let pidIssuerURL: String? = "https://<your-sandbox-pid-issuer>"  // OpenID4VCI credential issuer base URL
+  static let clientId: String = "<your-registered-client_id>"
+  static let redirectURI: String = "eu.europa.ec.euidi://authorization"   // must match the app URL scheme
+}
+```
+
+Then rebuild. Notes:
+
+- **Redirect URI** must be registered for your client at the sandbox authorization server and match
+  the app URL scheme in `Wallet/Info.plist` (default `eu.europa.ec.euidi`). Change both if the
+  sandbox requires a different scheme.
+- **Trust anchors:** to also *verify* sandbox-issued PIDs, add the sandbox issuer CA (`.der`) to the
+  app bundle and to `trustedReaderRootCertificates` in the same file. Issuance (sandbox Phase 1)
+  works from the issuer metadata without this.
+- **PAR / DPoP** are left `true`; adjust if the sandbox issuer's metadata differs.
+- Test by scanning a **credential offer** from the sandbox PID issuer — the wallet routes by issuer host.
+
 ## Caveats / re-enable for production
 
 - SwiftLint is disabled in the build phase for the hackathon — re-enable and pin a version
@@ -92,3 +120,23 @@ not live stepping. For step-through debugging use the Xcode device Run (§2). Ad
 - The fixes target **Demo** (stable `issuer.eudiw.dev`). Point at the **SPRIND sandbox** / your
   Keycloak per the hackathon plan when ready.
 - Bundle id + signing must be **yours**.
+
+## Wire the Demo config to the SPRIND sandbox
+
+The Demo issuer config is **sandbox-ready** via `SandboxConfig` in
+`Modules/logic-core/Sources/Config/WalletKitConfig.swift`. The real SPRIND/BMDS sandbox endpoints
+are issued to you at onboarding (registrar: https://sandbox.eudi-wallet.org/) and are **not
+public**, so paste them in:
+
+```swift
+enum SandboxConfig {
+  static let pidIssuerURL: String? = "https://<your-sandbox-pid-issuer>"  // from onboarding
+  static let clientId: String = "<your registered client_id>"
+  static let redirectURI: String = "eu.europa.ec.euidi://authorization"   // must match the app URL scheme
+}
+```
+
+While `pidIssuerURL` is `nil` the Demo build keeps using `issuer.eudiw.dev` (nothing breaks); when
+set, the sandbox issuer is offered first. You may also need to add the sandbox **PID-issuer CA**
+to `trustedReaderRootCertificates` and register the redirect URI with the sandbox authorization
+server.

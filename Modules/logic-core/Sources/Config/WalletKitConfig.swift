@@ -18,6 +18,27 @@ import logic_business
 import EudiWalletKit
 import Security
 
+// MARK: - SPRIND / BMDS EUDI Wallet Sandbox (hackathon)
+//
+// Paste the values from your sandbox onboarding pack (registrar:
+// https://sandbox.eudi-wallet.org/). While `pidIssuerURL` is nil/empty the Demo
+// build keeps using the public issuer.eudiw.dev services, so nothing breaks until
+// you opt in. See HACKATHON_BUILD_TESTFLIGHT.md → "Wire the Demo config to the SPRIND sandbox".
+enum SandboxConfig {
+  /// Sandbox PID issuer (OpenID4VCI credential-issuer) base URL,
+  /// e.g. "https://pid-issuer.sandbox.eudi-wallet.org". Leave nil to stay on eudiw.dev.
+  static let pidIssuerURL: String? = nil
+  /// Your wallet client_id as registered with the sandbox authorization server.
+  static let clientId: String = "wallet-dev"
+  /// Your registered OpenID4VCI redirect URI (must match the app URL scheme in Info.plist).
+  static let redirectURI: String = "eu.europa.ec.euidi://authorization"
+
+  static var isConfigured: Bool {
+    guard let url = pidIssuerURL else { return false }
+    return !url.isEmpty
+  }
+}
+
 protocol WalletKitConfig: Sendable {
 
   /**
@@ -104,7 +125,25 @@ struct WalletKitConfigImpl: WalletKitConfig {
     let openId4VciConfigurations: [VciConfig] = {
       switch configLogic.appBuildVariant {
       case .DEMO:
-        return [
+        var demoConfigs: [VciConfig] = []
+        // SPRIND/BMDS sandbox issuer first (only when configured in SandboxConfig).
+        if SandboxConfig.isConfigured, let sandboxURL = SandboxConfig.pidIssuerURL {
+          demoConfigs.append(
+            .init(
+              config: .init(
+                credentialIssuerURL: sandboxURL,
+                clientId: SandboxConfig.clientId,
+                keyAttestationsConfig: .init(walletAttestationsProvider: walletKitAttestationProvider),
+                authFlowRedirectionURI: URL(string: SandboxConfig.redirectURI)!,
+                requirePAR: true,
+                requireDpop: true,
+                cacheIssuerMetadata: true
+              ),
+              order: 2
+            )
+          )
+        }
+        demoConfigs.append(contentsOf: [
           .init(
             config: .init(
               credentialIssuerURL: "https://issuer.eudiw.dev",
@@ -129,7 +168,8 @@ struct WalletKitConfigImpl: WalletKitConfig {
             ),
             order: 0
           )
-        ]
+        ])
+        return demoConfigs
       case .DEV:
         return [
           .init(
